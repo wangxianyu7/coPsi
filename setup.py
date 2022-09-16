@@ -5,7 +5,7 @@ with open("requirements.txt","r") as f:
 	dependencies = f.read().splitlines()
 
 setup(
-	name="PhotProt",
+	name="coPsi",
 	author='Emil Knudstrup',
 	author_email='emil@phys.au.dk',
 	description='Calculate stellar rotation, inclination, and orientation.',

@@ -21,6 +21,26 @@ rsunfac = rsun.to_value('km')
 from .priors import *
 
 
+# =============================================================================
+# fancy legend
+# =============================================================================
+
+from matplotlib.legend_handler import HandlerBase
+class AnyObjectHandler(HandlerBase):
+	def create_artists(self, legend, handles,
+					x0, y0, width, height, fontsize, trans,twocolor=True):
+
+		l1 = plt.Line2D([x0,y0+width], [0.5*height,0.5*height],
+				  linestyle='-', color=handles[2],lw=3.0,zorder=-1)
+		l2 = plt.Line2D([x0,y0+width], [0.5*height,0.5*height],
+				  linestyle=handles[1], color=handles[0],lw=1.5,zorder=-1)          
+		return [l1, l2] 
+
+# =============================================================================
+# Stellar inclination/obliquity class
+# =============================================================================
+
+
 class iStar(object):
 
 	parameters = [#'incs', 
@@ -29,7 +49,8 @@ class iStar(object):
 				'Prot', 
 				'Rs', 
 				'vsini',
-				'Teff'
+				'Teff',
+				'psi'
                ]
 
 	stepParameters = [
@@ -45,6 +66,7 @@ class iStar(object):
 			'incs'  : r'$i_\star \ \rm (deg)$',
 			'v'     : r'$v \ \rm (km/s)$',
 			'vsini' : r'$v \sin i_\star \ \rm (km/s)$',
+			'psi'  : r'$\psi \ \rm (deg)$',
 			}
 
 	def __init__(self,
@@ -81,6 +103,21 @@ class iStar(object):
 		self.vsini = vsini
 		self.cosi = cosi
 		self.Teff = Teff
+		self.cLouden = {
+					'single' : {
+						'c0' : [9.57,0.29],
+						'c1' : [8.01,0.54],
+						'c2' : [3.30,0.62],
+						'sini' : [0.856,0.036]
+						},
+					'two' : {
+						'c0' : [9.44,0.28],
+						'c1' : [8.87,0.61],
+						'c2' : [4.05,0.62],
+						'sini' : [0.794,0.052],
+						'sini_down' : [0.928,0.042]
+						}
+					}
 
 	#def coPsi(self,inco,incs,lam,return_psi=True):
 	def coPsi(self):
@@ -116,9 +153,14 @@ class iStar(object):
 
 	#def stellarInclination(Prot,Rs,vsini):
 	def stellarInclinationDirectly(self,convert=True):
-		'''Calculate stellar inclination
+		'''Stellar inclination directly
 		
-		incs = Prot*vsini/(2*pi*Rs)
+		Calculate the stellar inclination from the simple relation
+
+		.. :math:`i_\star = P_{\rm rot} v \sin i_\star /(2 \pi R_\star)`.
+
+		This assumes that rotation speed at the equator, :math:`v`, and the projected rotation speed, :math:`v \sin i_\star`, are independent.
+		(Which they are not.)
 
 		Parameters
 		----------
@@ -152,35 +194,26 @@ class iStar(object):
 		incs = np.arcsin(si)
 		self.dist['incs'] =  np.rad2deg(incs)
 
-	def stellarInclinationLouden(self,relation='two'):
+	def stellarInclinationLouden(self,oblDist='two'):
     
-		cs = {
-			'single' : {
-			'c0' : [9.57,0.29],
-			'c1' : [8.01,0.54],
-			'c2' : [3.30,0.62],
-			'sini' : [0.856,0.036]
-				},
-			'two' : {
-			'c0' : [9.44,0.28],
-			'c1' : [8.87,0.61],
-			'c2' : [4.05,0.62],
-			'sini' : [0.794,0.052],
-			'sini_down' : [0.928,0.042]
-				}
-			}
-
+		try:
+			self.dist
+		except AttributeError:
+			print('Distributions not initilialized.\nCalling iStar.createDistributions.')
+			self.createDistributions()
+		
 		N = len(self.dist['Teff'])
-		c0 = np.random.normal(cs[relation]['c0'][0],cs[relation]['c0'][1],N)
-		c1 = np.random.normal(cs[relation]['c1'][0],cs[relation]['c1'][1],N)
-		c2 = np.random.normal(cs[relation]['c2'][0],cs[relation]['c2'][1],N)
+		c0 = np.random.normal(self.cLouden[oblDist]['c0'][0],self.cLouden[oblDist]['c0'][1],N)
+		c1 = np.random.normal(self.cLouden[oblDist]['c1'][0],self.cLouden[oblDist]['c1'][1],N)
+		c2 = np.random.normal(self.cLouden[oblDist]['c2'][0],self.cLouden[oblDist]['c2'][1],N)
 		tau = (self.dist['Teff']-6250)/300
 		v_avg = c0 + c1*tau + c2*tau**2
-		vs = self.dist['vsini']#np.random.normal(vsini[0],vsini[1],N)
+		vs = self.dist['vsini']
 		si = vs/v_avg
 		incs = np.rad2deg(np.arcsin(si))
 		incs = incs[np.isfinite(incs)]
 		self.dist['incs'] = incs
+
 		#inc_star[ii] = incs
   
 		# for ii in range(N):
@@ -201,6 +234,51 @@ class iStar(object):
 		# 	si = 1/c
 		# 	incs = np.arcsin(si)*180/np.pi
 		# 	inc_star[ii] = incs
+
+
+	def plotLouden(self,teffs=np.linspace(5700,6700,1000),inclinations=[90,45,30,15],
+					ax=None,oblDist='single',Teff=None,sTeff=0,vsini=None,svsini=0.,
+					usetex=False,font=12,ymax=25,xmax=6700):
+		if not ax:
+			plt.rc('text',usetex=usetex)
+			fig = plt.figure()
+			ax = fig.add_subplot(111)
+
+		c0 = self.cLouden[oblDist]['c0'][0]
+		c1 = self.cLouden[oblDist]['c1'][0]
+		c2 = self.cLouden[oblDist]['c2'][0]
+
+		tau = (teffs - 6250)/300
+		y = c0 + c1*tau + c2*tau**2
+		labs, hands = [], []
+		for ii, inc in enumerate(inclinations):
+
+			lab = r'$i_\star=' + str(inc) + '^\circ$'
+			labs.append(lab)
+			hands.append(('C{}'.format(ii),'-','k'))
+			ax.plot(teffs,y*np.sin(np.deg2rad(inc)),color='k',lw=3.0)
+			ax.plot(teffs,y*np.sin(np.deg2rad(inc)),color='C{}'.format(ii),lw=2.0)
+
+
+		ax.set_xlabel(r'$T_{\rm eff} \ \rm (K)$',fontsize=font)
+		ax.set_ylabel(r'$v \sin i_\star \ \rm (km/s)$',fontsize=font)
+		ax.tick_params(axis='both', labelsize=font)
+
+		ax.set_ylim(0,ymax)
+		ax.set_xlim(5700,6700)
+
+		if (vsini != None) & (Teff != None):
+			ax.errorbar(Teff,vsini,yerr=svsini,xerr=sTeff,marker='o',mec='k',mfc='C7',ecolor='k')
+		elif vsini != None:
+			ax.axhline(vsini,color='C7')
+		elif Teff != None:
+			ax.axvline(Teff,color='C7')
+
+		ax.legend(hands, labs,
+				handler_map={tuple: AnyObjectHandler()},
+				fancybox=True,shadow=True,
+				fontsize=font,
+				loc='upper left')
 
 
 	def stellarInclination(self,ndraws=10000,nwalkers=100,nproc=1,
@@ -266,7 +344,6 @@ class iStar(object):
 		with Pool(nproc) as pool:
 			sampler = emcee.EnsembleSampler(nwalkers,ndim,lnprob,
 					pool=pool,moves=moves,kwargs=pars)
-
 
 			print('Number of draws is {}.\n'.format(ndraws))
 						
@@ -344,7 +421,6 @@ class iStar(object):
 			results[fp] = [val,lower,upper]
 			medians.append(val)
 		labs = [self.labels[par] for par in pps]
-		#labels = [ r'$R_\star$',r'$P_{\rm rot}$',r'$\cos i_\star$',r'$i_\star$',r'$v$',r'$v \sin i_\star$',r'$\ln \mathcal{L}$']
 		labs.append(r'$\ln \mathcal{L}$')
 		res_df = pd.DataFrame(results)
 		res_df.to_csv(path+'results.csv')
@@ -353,7 +429,7 @@ class iStar(object):
 			all_samples = np.concatenate(
 				(flat_samples, log_prob_samples[:, None]), axis=1)
 			medians.append(np.amax(log_prob_samples[:, None]))
-			plt.figure()
+			#plt.figure()
 			corner.corner(all_samples, labels=labs, truths=None)
 			plt.savefig(path+'corner.pdf')
 
@@ -374,7 +450,7 @@ class iStar(object):
 					N = len(pars[par])
 				else:
 					print('{} should be either tuple (see __init__) or numpy.ndarray'.format(par))
-		print(generateDist)			
+
 		for par in generateDist:
 			if pars[par][-1] == 'gauss':
 				self.dist[par] = np.random.normal(pars[par][0],pars[par][1],N)
@@ -383,10 +459,10 @@ class iStar(object):
 
 		#if convert: self.convertUnits()
 
-	def getKDE(self,z):
+	def getKDE(self,z,**kwargs):
 
 		kde = sm.nonparametric.KDEUnivariate(z)
-		kde.fit()  # Estimate the densities
+		kde.fit(**kwargs)  # Estimate the densities
 		x, y = kde.support, kde.density
 		return x, y
 
@@ -400,7 +476,7 @@ class iStar(object):
 		Parameters
 		----------
 		data : array
-			Sequence of real values..
+			Sequence of real values.
 		lev : float, optional
 			Level for hpd (0 < lev < 1). The default is 0.68.
 
@@ -472,29 +548,46 @@ class iStar(object):
 
 
 	def diagnostics(self,z,par='Parameter',ax=None,lev=0.68):
-		print(z)
 		if type(z) == str:
 			par = z
 			z = self.dist[z]
 
-		
-		#print(self.dist[z])
-		print(z)
-		print(lev)
 		val, up, low = self.getConfidence(z,lev=lev)
-		print('{}={}+{}-{}'.format(par,val,up,low))
+		print('Median and confidence level ({} credibility):'.format(lev))
+		print('{}={:0.3f}+{:0.3f}-{:0.3f}'.format(par,val,up,low))
 		xkde, ykde = self.getKDE(z)
 		if ax == None:
 			fig = plt.figure()
 			ax = fig.add_subplot(111)
-		ax.plot(xkde,ykde)
+		ax.plot(xkde,ykde,color='k')
+
+
+		vals = (xkde > (val-low)) & (xkde < (up+val))
+		xs = xkde[vals]
+		ys = ykde[vals]
+		ax.fill_between(xs,ys,color='C0',alpha=0.5, label=r"$\rm HPD$")
+
+
+		ax.set_ylim(ymin=0.0)
+		ax.set_xlim(min(xkde),max(xkde))
+
+		ax.set_ylabel(r'$\rm KDE$')
+		try:
+			ax.set_xlabel(self.labels[par])
+		except KeyError:
+			ax.set_xlabel(par)
+
+		idx = np.argmin(abs(xkde-val))
+		plt.vlines(val,ymin=0,ymax=ykde[idx],linestyle='-',color='k')
+		idx_up = np.argmin(abs(xkde-(up+val)))
+		plt.vlines(up+val,ymin=0,ymax=ykde[idx_up],linestyle='--',color='k')
+		idx_low = np.argmin(abs(xkde-(val-low)))
+		plt.vlines(val-low,ymin=0,ymax=ykde[idx_low],linestyle='--',color='k')
+
 
 def lnprob(positions,**pars):
-	#parameters = master_dict['pars']
 	log_prob = 0.0
-	#fps = self.stepParameters
 	fps = pars['FPs']
-	#pars = vars(self)
 	for idx, par in enumerate(fps):
 		val = positions[idx]
 		pri = pars[par][:4]
@@ -512,6 +605,7 @@ def lnprob(positions,**pars):
 			log_prob += np.log(prob)
 		else:
 			return -np.inf
+
 	nom = 2*np.pi*positions[0]*rsunfac
 	den = positions[1]*dayfac
 	v = nom/den

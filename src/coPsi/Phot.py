@@ -3,6 +3,7 @@
 
 import numpy as np
 from scipy.signal import savgol_filter
+import matplotlib.pyplot as plt
 
 class Data(object):
 	
@@ -14,7 +15,12 @@ class Data(object):
 			self.x = x
 			self.y = y
 			self.dy = dy
-			self.cadence = cadence
+			if cadence is None:
+				self.getCadence()
+			else:
+				self.cadence = cadence
+
+		self.ii = 0
 
 	def readData(self,file):
 		arr = np.loadtxt(file)
@@ -77,6 +83,25 @@ class Data(object):
 		self.fillGaps(gap=gap,yfill=yfill,cadence=cadence)
 		#self.filterData(**kwargs)
 
-	def to_rotator(self):
-		pass
+	def plot(self,ax=None,dots=1,return_ax=0,font=12,usetex=False):
+
+		if not ax:
+			plt.rc('text',usetex=usetex)
+			fig = plt.figure()
+			ax = fig.add_subplot(111)
+		if dots:
+			ax.plot(self.x-min(self.x),self.y,marker='o',markersize=2,color='k',ls='none')
+			ax.plot(self.x-min(self.x),self.y,marker='o',markersize=1,color='C{}'.format(self.ii),ls='none')
+		else:
+			ax.plot(self.x,self.y,color='k',lw=0.5)
+
+		ax.set_xlabel(r'$\rm Time \ (days)$',fontsize=font)
+		ax.set_ylabel(r'$\rm Relative \ brightness$',fontsize=font)
+		ax.tick_params(axis='both',labelsize=font)
+
+		self.ii += 1
+		if return_ax: return ax
+
+	# def to_rotator(self):
+	# 	pass
 		

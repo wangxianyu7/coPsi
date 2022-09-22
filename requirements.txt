@@ -2,3 +2,5 @@ numpy
 statsmodels
 scipy
 matplotlib
+emcee
+corner

@@ -33,6 +33,7 @@ class Rotator(Data):
 		self.tau = lags*self.cadence
 
 	def smoothACF(self,window=401,poly=3):
+		self.racf = self.acf
 		self.acf = savgol_filter(self.acf,window,poly)
 
 
@@ -60,7 +61,8 @@ class Rotator(Data):
 		
 		popt,pcov = curve_fit(self.gauss,time,power,p0=p0)
 		if print_pars:
-			print(popt)
+			print('Fit Gaussian to periodogram:')
+			print('Prot = {:0.4f}+/-{:0.4f} d'.format(popt[1],popt[2]))
 		self.fitPars = popt
 		self.fitCov = pcov
 		#return popt
@@ -77,6 +79,55 @@ class Rotator(Data):
 		self.periodogram()
 		self.fitProt()
 
+
+	def plotACF(self,ax=None,font=12,ymax=0.2,usetex=False):
+		
+		if not ax:
+			plt.rc('text',usetex=usetex)
+			fig = plt.figure()
+			ax = fig.add_subplot(111)
+		ax.plot(self.tau,self.racf,color='k',alpha=0.2,label=r'$\rm Raw \ ACF$')
+		ax.plot(self.tau,self.acf,color='k',label=r'$\rm Smoothed$')
+		ax.set_xlim(min(self.tau),max(self.tau))
+		ax.set_ylim(ymax=ymax)
+		ax.set_xlabel(r'$\tau_k \ \rm (days)$',fontsize=font)
+		ax.set_ylabel(r'$\rm ACF$',fontsize=font)
+		ax.tick_params(axis='both',labelsize=font)
+		ax.legend()
+
+	def plotPeriodogram(self,ax=None,xmax=None,font=12,usetex=False):
+		if not ax:
+			plt.rc('text',usetex=usetex)
+			fig = plt.figure()
+			ax = fig.add_subplot(111)
+		time = 1/self.frequency
+		ax.plot(time,self.power,lw=3.0,color='k')
+		ax.plot(time,self.power,lw=1.5,color='C1',label=r'$\rm Periodogram$')
+
+		if not xmax:
+			xmax = (np.amax(self.x)-np.amin(self.x))*0.5
+		ax.set_xlim(0.0,xmax)
+		
+		try:
+			mu = self.fitPars[1]
+			sigma = self.fitPars[2]
+			low = mu-sigma
+			high = mu+sigma
+
+			cc = (time < high) & (time > low)
+			yy = self.gauss(time,*self.fitPars)*np.amax(self.power)
+			ax.fill_between(time[cc],yy[cc],color='C0',alpha=0.6,zorder=-1)#,transform=ax.transAxes)
+			ax.plot(time,yy,lw=2.0,color='k')
+			ax.plot(time,yy,lw=1.0,color='C0',label=r'$\rm Gaussian \ fit$')
+			ax.axvline(mu,linestyle='-',color='C7')
+		except AttributeError:
+			pass
+		
+		ax.set_xlabel(r'$\rm Period \ (days)$',fontsize=font)
+		ax.set_ylabel(r'$\rm Periodogram$',fontsize=font)
+		ax.axhline(0.0,linestyle='-',color='k',zorder=-1)
+		ax.tick_params(axis='both',labelsize=font)
+		ax.legend()
 
 if __name__ == '__main__':
 	dat = np.loadtxt('phot/KELT-11_cad_120sec_rotation.txt')

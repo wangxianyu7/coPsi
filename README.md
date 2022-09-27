@@ -2,13 +2,6 @@
 Stellar rotation, inclination, and orientation.
 
 
-```mermaid
-  graph TD;
-      A[istar]-->D[$\psi$];
-      B[io]-->D;
-      C[lambda]-->D;	
-
-```
 
 ### Installation
 `cd /path/to`

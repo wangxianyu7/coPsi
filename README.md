@@ -2,6 +2,14 @@
 Stellar rotation, inclination, and orientation.
 
 
+```mermaid
+  graph TD;
+      A[istar]-->D[psi];
+      B[io]-->D;
+      C[lambda]-->D;	
+
+```
+
 ### Installation
 `cd /path/to`
 
@@ -15,6 +23,7 @@ Stellar rotation, inclination, and orientation.
 
 
 ```python
+import coPsi
 
 ## Data
 
@@ -56,6 +65,7 @@ rot.plotPeriodogram()
 
 
 ```python
+import coPsi
 
 ## Rotation
 
@@ -74,10 +84,11 @@ rot.plotPeriodogram()
 ```
 
 ```python
+import coPsi
 
 ## Masuda & Winn 
 
-## Instantiate iStar with values for Teff and vsini
+## Instantiate iStar with values for Rs, Prot, and vsini
 incs = coPsi.iStar(Rs=(2.082,0.061,1,4,'gauss'),
 				   Prot=(6.7,0.6,1,12,'gauss'),
 				   vsini=(6.0,0.4,1,12,'gauss'))
@@ -91,7 +102,8 @@ incs.stellarInclination()
 
 
 ```python
-
+import coPsi
+import numpy as np
 ## Louden
 
 ## Instantiate iStar with values for Teff and vsini
@@ -102,7 +114,7 @@ incs.createDistributions()
 incs.plotLouden(Teff=6250,vsini=6.0,sTeff=100,svsini=0.5)
 ## Calculate the stellar incliation using the Louden et al. (2021) relation
 incs.stellarInclinationLouden()
-## Calculate median and credible inter and plot the resulting KDE
+## Calculate median and credible interval and plot the resulting KDE
 incs.diagnostics('incs')
 
 ## Let's say we also have distributions for lambda and the orbital inlination 
@@ -120,6 +132,7 @@ incs.diagnostics('psi')
 
 
 ```python
+import coPsi
 
 ## Inclination directly (but not entirely correct)
 

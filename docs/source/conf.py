@@ -43,7 +43,8 @@ extensions = [
 
 # mock imports (alternatively add packages to docs/requirements.txt)
 autodoc_mock_imports = ['matplotlib','scipy','astropy',
-                        'emcee','pandas','statsmodels']
+                        'emcee','pandas','corner'
+                        'statsmodels']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

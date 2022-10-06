@@ -1,25 +1,29 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Fri Sep  9 13:00:12 2022
 
-@author: emil
-"""
+# =============================================================================
+# external modules
+# =============================================================================
 import numpy as np
-import astropy.units as u
 import statsmodels.api as sm
 import matplotlib.pyplot as plt
 from multiprocessing import Pool
 import pandas as pd
 import emcee
+
+# =============================================================================
+# conversions
+# =============================================================================
+import astropy.units as u
 dayfac = 86400
 rsun = 1*u.R_sun
 rsunfac = rsun.to_value('km')
 
-
+# =============================================================================
+# coPsi modules
+# =============================================================================
 
 from .priors import *
-
 
 # =============================================================================
 # fancy legend
@@ -27,6 +31,12 @@ from .priors import *
 
 from matplotlib.legend_handler import HandlerBase
 class AnyObjectHandler(HandlerBase):
+	'''Fancy legend
+	
+	Adds black borders to the lines in the legend.
+	
+
+	'''
 	def create_artists(self, legend, handles,
 					x0, y0, width, height, fontsize, trans,twocolor=True):
 
@@ -42,7 +52,46 @@ class AnyObjectHandler(HandlerBase):
 
 
 class iStar(object):
+	'''Stellar inclination.
 
+
+	The variables in the constructor are tuples like (:math:`\mu,\sigma,a,b`,'distribution') used to create distributions,
+	where :math:`\mu` is the mean/median, :math:`\sigma` is the standard deviation, :math:`a` is the lower boundary, and :math:`b` is the upper boundary.
+	'distribution' is the type of distribution, which can be 'gauss', 'uniform', and 'tgauss' (truncated gaussian).
+
+	:param inco: The orbital inclination (deg).
+	:type inco: tuple
+
+	:param incs: The stellar inclination (deg).
+	:type incs: tuple
+
+	:param lam: The projected obliquity (deg).
+	:type lam: tuple
+	
+	:param Prot: Stellar rotation period (days).
+	:type Prot: tuple
+
+	:param vsini: Projected stellar rotation speed (km/s).
+	:type vsini: tuple
+
+	:param cosi: Cosine of stellar inclination. Used in :py:class:`stellarInclination`.
+	:type cosi: tuple
+
+	:param Rs: Stellar radius (:math:`R_\odot`).
+	:type Rs: tuple
+
+	
+	:param parameters: List of parameters for which we can create distributions.
+	:type parameters: list
+
+	:param stepParameters: List of parameters to step in for MCMC.
+	:type stepParameters: list
+
+	:param labels: Dictionary to map labels for parameters.
+	:type labels: dict
+
+
+	'''
 	parameters = [#'incs', 
 				'inco', 
 				'lam', 
@@ -75,24 +124,11 @@ class iStar(object):
               Prot = (3.5,0.5,0.0,10.,'gauss'),
               Rs = (1.0,0.1,0.5,2.0,'gauss'),
               vsini = (4.5,0.5,0.0,10.,'gauss'),
-              cosi = (0,0.1,-1.0,1.0,'uni'),
+              cosi = (0,0.1,-1.0,1.0,'uniform'),
               Teff = (6250,100,3000,9000,'gauss'),
               ):
-		'''
+		'''Constructor
   
-
-		Parameters
-		----------
-		inco : float, array
-			Orbital inclination (degrees).
-		lam : float, array
-			Projected obliquity (degrees).  
-		Prot : float, array
-			Rotation period (seconds).
-		Rs : float, array
-			Stellar radius (km).
-		vsini : float, array
-			Stellar projected rotation speed (km/s).
 
   
 		'''
@@ -121,23 +157,17 @@ class iStar(object):
 
 	#def coPsi(self,inco,incs,lam,return_psi=True):
 	def coPsi(self):
-		'''Calculates cos(psi)
+		'''Calculate :math:`\psi`.
 		
-		cos(psi) = sin(incs)*sin(inco)*cos(lam) + cos(incs)*cos(inco)
-		
-		Parameters
-		----------
-		inco : float, array
-			Orbital inclination (degrees).
-		incs : float, array
-			Stellar inclination (degrees).
-		lam : float, array
-			Projected obliquity (degrees).
+		:math:`\psi` and :math:`\cos \psi` are calculated from
 
-		Returns
-		-------
-		float, array
-			Return psi, cos(psi) or just cos(psi), depending on return_psi.
+		.. math::
+			\cos \psi = \sin i_\star \sin i_{\\rm o} \cos \lambda + \cos i_\star \cos i_{\\rm o} \, ,
+		
+		where :math:`\lambda` is the projected obliquity, :math:`i_\star` is the stellar inclination, and :math:`i_{\\rm o}` is the orbital incliation.
+
+		
+		Distributions for :math:`\psi` and :math:`\cos \psi` can be accessed through coPsi.iStar.dist['psi'] respectively coPsi.iStar.dist['cosp'].
 
 		'''
 		inco = np.deg2rad(self.dist['inco'])
@@ -146,35 +176,26 @@ class iStar(object):
 		
 		self.dist['cosp'] = np.sin(incs)*np.sin(inco)*np.cos(lam) + np.cos(incs)*np.cos(inco)
 		self.dist['psi'] = np.rad2deg(np.arccos(self.dist['cosp']))
-		#self.psi = np.rad2deg(np.arccos(self.cosp))
-		#self.cosp = np.sin(incs)*np.sin(inco)*np.cos(lam) + np.cos(incs)*np.cos(inco)
-  
-  
+    
 
-	#def stellarInclination(Prot,Rs,vsini):
 	def stellarInclinationDirectly(self,convert=True):
-		'''Stellar inclination directly
+		'''Stellar inclination directly.
 		
 		Calculate the stellar inclination from the simple relation
 
-		.. :math:`i_\star = P_{\rm rot} v \sin i_\star /(2 \pi R_\star)`.
+		.. math::
+			i_\star = \\frac{P_{\\rm rot} v \sin i_\star}{2 \pi R_\star} \, ,
 
-		This assumes that rotation speed at the equator, :math:`v`, and the projected rotation speed, :math:`v \sin i_\star`, are independent.
-		(Which they are not.)
+		where :math:`P_{\\rm rot}` is the stellar rotation period obliquity, :math:`R_\star` is the stellar radius, and :math:`v \sin i_\star` is the projected stellar rotation speed.
+		
+		.. note::
+			This assumes that rotation speed at the equator, :math:`v`, and the projected rotation speed, :math:`v \\sin i_\\star`, are independent, which they are not.
 
-		Parameters
-		----------
-		Prot : float, array
-			Rotation period (seconds).
-		Rs : float, array
-			Stellar radius (km).
-		vsini : float, array
-			Stellar projected rotation speed (km/s).
+		
+		Distribution for :math:`i_\star` can be accessed through coPsi.iStar.dist['incs'].
 
-		Returns
-		-------
-		float, array
-			Return Stellar inclination.
+		:param convert: Whether to convert stellar radius from :math:`R_\odot` to km and :math:`P_{\\rm rot}` from days to seconds.
+		:type convert: bool, optional. Default ``True``.
 
 		'''
 		try:
@@ -195,7 +216,14 @@ class iStar(object):
 		self.dist['incs'] =  np.rad2deg(incs)
 
 	def stellarInclinationLouden(self,oblDist='two'):
-    
+		'''Stellar inclination relation
+
+		Calculate stellar inclination using relation from :cite:t:`Louden2021`.
+
+		:param oblDist: The assumed obliquity distribution - 'single' or 'two'. Optional, default 'two'.
+		:type oblDist: str
+		
+		'''
 		try:
 			self.dist
 		except AttributeError:
@@ -214,31 +242,55 @@ class iStar(object):
 		incs = incs[np.isfinite(incs)]
 		self.dist['incs'] = incs
 
-		#inc_star[ii] = incs
-  
-		# for ii in range(N):
-		# 	t = np.random.normal(teff[0],teff[1])
-		# 	tau = (t-6250)/300
-		# 	if tau < 0.0:
-		# 		sini = cs['two']['sini_down']
-		# 	else:
-		# 		sini = cs['two']['sini']
-			
-		# 	#print(tau)
-		# 	c0 = np.random.normal(cs['two']['c0'][0],cs['two']['c0'][1])
-		# 	c1 = np.random.normal(cs['two']['c1'][0],cs['two']['c1'][1])
-		# 	c2 = np.random.normal(cs['two']['c2'][0],cs['two']['c2'][1])
-		# 	v_avg = c0 + c1*tau + c2*tau**2
-		# 	vs = vsini[ii]#np.random.normal(vsini[0],vsini[1])
-		# 	c = v_avg/vs
-		# 	si = 1/c
-		# 	incs = np.arcsin(si)*180/np.pi
-		# 	inc_star[ii] = incs
 
-
-	def plotLouden(self,teffs=np.linspace(5700,6700,1000),inclinations=[90,45,30,15],
+	def plotLouden(self,teffs=[5700,6700,1000],inclinations=[90,45,30,15],
 					ax=None,oblDist='single',Teff=None,sTeff=0,vsini=None,svsini=0.,
 					usetex=False,font=12,ymax=25,xmax=6700):
+		'''Plot Louden relations.
+
+		Plot the :math:`T_{\\rm eff}`,:math:`v \sin i_\star` from :cite:t:`Louden2021`. Compare by providing values for :math:`T_{\\rm eff}`,:math:`v \sin i_\star`.
+		
+		:param teffs: Grid values for :math:`T_{\\rm eff}` - [start,end,npoints]. Optional, ``[5700,6700,1000]``.
+		:type teffs: list
+
+		:param inclinations: Values to plot for :math:`i_\star`. Optional, default ``[90,45,30,15]``.
+		:type inclinations: list
+
+		:param ax: Axis in which to plot the KDE. Optional, default ``None``, figure and axis will be created.
+		:type ax: :py:class:`matplotlib.axes._subplots.AxesSubplot`
+
+		:param oblDist: The assumed obliquity distribution - 'single' or 'two'. Optional, default 'single'.
+		:type oblDist: str
+
+		:param Teff: :math:`T_{\\rm eff}`. Optional, default ``None``.
+		:type Teff: float
+
+		:param sTeff: Error on :math:`T_{\\rm eff}`. Optional, default 0.
+		:type sTeff: float
+
+		:param vini: :math:`v \sin i_\star`. Optional, default ``None``.
+		:type vini: float
+
+		:param svini: Error on :math:`v \sin i_\star`. Optional, default 0.
+		:type svini: float
+
+		:param usetex: Whether to use LaTeX in plots. Optional, default ``False``.
+		:type usetex: bool
+
+		:param font: Fontsize for labels. Optional, default 12.
+		:type font: float
+
+		:param ymax: Maximum value for :math:`v \sin i_\star`. Optional, default 25.
+		:type ymax: float
+
+		:param xmax: Maximum value for :math:`T_{\\rm eff}`. Optional, default 6700.
+		:type xmax: float
+
+
+
+		'''
+		teffs = np.linspace(teffs[0],teffs[1],teffs[2])
+
 		if not ax:
 			plt.rc('text',usetex=usetex)
 			fig = plt.figure()
@@ -283,26 +335,47 @@ class iStar(object):
 
 	def stellarInclination(self,ndraws=10000,nwalkers=100,nproc=1,
                         moves=None,path='./',
-                        plot_corner=True,
+                        plot_corner=True,save_df=True,
+                        save_corner=True,save_convergence=False,
                         plot_convergence=True):
-		'''Calculate stellar inclination
+		'''Stellar inclination (properly)
 		
-		Following Masuda & Winn (2020)
+		Here the stellar inclination is calculated following :cite:t:`Masuda2020`, where we perform a Monte Carlo Markov Chain (MCMC) sampling of the posterior for :math:`i_\star`.
+		:py:class:`emcee` :cite:p:`emcee` is used for the sampling.
 		
 
-		Parameters
-		----------
-		Prot : float, array
-			Rotation period (seconds).
-		Rs : float, array
-			Stellar radius (km).
-		vsini : float, array
-			Stellar projected rotation speed (km/s).
+		:param ndraws: Number of draws for the MCMC. Optional, default 10000.
+		:type ndraws: int
 
-		Returns
-		-------
-		float, array
-			Return Stellar inclination.
+		:param nwalkers: Number of walkers for MCMC. Optional, default 10000.
+		:type nwalkers: int
+
+		:param nproc: Number of CPUs for multiprocessing. Optional, default 1.
+		:type nproc: int
+
+		:param moves: :py:class:`emcee.moves` object. Optional, default ``None``.
+		:type moves: int
+
+		:param path: Path to store results. Optional, default './'.
+		:type path: str
+
+		:param plot_corner: Whether to create a :py:class:`corner` :cite:p:`corner` plot. Optional, default ``True``.
+		:type plot_corner: bool
+
+		:param save_df: Whether to save the results in a .csv file. Optional, default ``True``.
+		:type save_df: bool
+
+		:param save_corner: Whether to save the corner plot. Optional, default ``True``.
+		:type save_corner: bool
+
+		:param save_convergence: Whether to save the convergence plot. Optional, default ``False``.
+		:type save_convergence: bool
+
+		:param plot_covergence: Whether to plot the autocorrelation for the MCMC. Optional, default ``True``.
+		:type plot_covergence: bool
+		
+
+
 
 		'''
 
@@ -315,12 +388,12 @@ class iStar(object):
 				for idx, par in enumerate(fps):
 					pri = pars[par][:4]
 					dist = pars[par][-1]
-					assert dist in ['gauss','tgauss','uni','jeff'], print('{} is not a valid option for the starting distribution.'.format(dist))
+					assert dist in ['gauss','tgauss','uniform','jeff'], print('{} is not a valid option for the starting distribution.'.format(dist))
 					if dist == 'tgauss':
 						start[idx] = tgauss_prior_dis(pri[0],pri[1],pri[2],pri[3])
 					elif dist == 'gauss':
 						start[idx] = gauss_prior_dis(pri[0],pri[1])
-					elif dist == 'uni':
+					elif dist == 'uniform':
 						start[idx] = flat_prior_dis(np.random.uniform(),pri[2],pri[3])
 					elif dist == 'jeff':
 						start[idx] = jeff_prior_dis(np.random.uniform(),pri[2],pri[3])
@@ -386,7 +459,8 @@ class iStar(object):
 			axc.plot(nn,yy,'-',color='C0',lw=2.0)
 			axc.set_xlabel(r'$\rm Step \ number$')
 			axc.set_ylabel(r'$\rm \mu(\hat{\tau})$')
-			plt.savefig(path+'/autocorr.pdf')
+			if save_convergence:
+				plt.savefig(path+'/autocorr.pdf')
 
 
 		tau = sampler.get_autocorr_time(tol=0)
@@ -423,20 +497,32 @@ class iStar(object):
 		labs = [self.labels[par] for par in pps]
 		labs.append(r'$\ln \mathcal{L}$')
 		res_df = pd.DataFrame(results)
-		res_df.to_csv(path+'results.csv')
+		if save_df:
+			res_df.to_csv(path+'results.csv')
 		if plot_corner:
 			import corner
 			all_samples = np.concatenate(
 				(flat_samples, log_prob_samples[:, None]), axis=1)
 			medians.append(np.amax(log_prob_samples[:, None]))
-			#plt.figure()
 			corner.corner(all_samples, labels=labs, truths=None)
-			plt.savefig(path+'corner.pdf')
+			if save_corner:
+				plt.savefig(path+'corner.pdf')
+		return res_df
+
 
 
 	
 
-	def createDistributions(self,N=2000):#,convert=True):
+	def createDistributions(self,N=2000):
+		'''Create distributions for parameters
+
+		Function that creates distributions for the parameters given the values in the tuples of `iStar()`. If a distribution (from an MCMC for instance) is set in place of the tuple, this (these) distribution will be used instead. The length of these distributions will be used for those, where we do create a distribution.
+
+		:param N: Number of draws for distributions.
+		:type N: int
+
+		'''
+
 		pars = vars(self)
 		self.dist = {}
 		generateDist = []
@@ -457,10 +543,20 @@ class iStar(object):
 			elif pars[par][-1] == 'uniform':
 				self.dist[par] = np.random.uniform(pars[par][2],pars[par][3],N)
 
-		#if convert: self.convertUnits()
 
 	def getKDE(self,z,**kwargs):
+		'''KDE for distribution
 
+		Calculates the kernel density estimation (KDE) using :py:class:`statsmodel.nonparametric.KDEUnivariate()`.
+
+
+		:param z: Distribution for which to calculate KDE.
+		:type z: array
+
+		:returns: KDE support, KDE density
+		:rtype: array, array
+
+		'''
 		kde = sm.nonparametric.KDEUnivariate(z)
 		kde.fit(**kwargs)  # Estimate the densities
 		x, y = kde.support, kde.density
@@ -468,33 +564,21 @@ class iStar(object):
 
 
 		
-	def hpd(self,data, lev=0.68) :
+	def hpd(self,data,lev=0.68) :
 		''' The Highest Posterior Density.
 		
 		The Highest Posterior Density (credible) interval of data at level lev.
 
-		Parameters
-		----------
-		data : array
-			Sequence of real values.
-		lev : float, optional
-			Level for hpd (0 < lev < 1). The default is 0.68.
 
-		Raises
-		------
-		RuntimeError
-			If insufficient data is supplied.
+		:param data: Sequence of real values.
+		:type data: array
 
-		Returns
-		-------
-		TYPE
-			DESCRIPTION.
-		TYPE
-			DESCRIPTION.
-		i : TYPE
-			DESCRIPTION.
-		TYPE
-			DESCRIPTION.
+		:param lev: Confidence level (0 < lev < 1), optional. The default is 0.68.
+		:type lev: float
+
+		:returns: ()
+		:rtype: tuple	
+		
 
 		'''
 		
@@ -522,21 +606,16 @@ class iStar(object):
 		'''Calculate confidence level.
 		
 
-		Parameters
-		----------
-		z : array
-			Distribution for which to calculate confidence intervals.
-		lev : float, optional
-			Level of confidence. The default is 0.68.
+		:param z: Sequence of real values.
+		:type z: array
 
-		Returns
-		-------
-		val : float
-			Median value.
-		up : float
-			Upper uncertainty.
-		low : float
-			Lower uncertainty.
+		:param lev: Confidence level (0 < lev < 1), optional. The default is 0.68.
+		:type lev: float
+
+		:returns: Median value, upper uncertainty, lower uncertainty.
+		:rtype: float, float, float
+
+
 
 		'''
 		val = np.median(z)
@@ -548,6 +627,29 @@ class iStar(object):
 
 
 	def diagnostics(self,z,par='Parameter',ax=None,lev=0.68):
+		'''Diagnostics and KDE plot
+
+		This function calculates and prints the median and confidence intervals (from :py:class:`hpd`). It also creates a plot of the KDE distribution with the confidence levels highlighted.
+
+
+		Provide either the name of the parameter from :py:class:`parameters` or give a distribution directly. In the latter case the desired label can be provdided in `par`.
+
+		:param z: The name of the parameter or sequence of real values/distribution.
+		:type z: str, array
+
+		:param par: Parameter to plot and calculate confidence levels for. Optional, default 'Parameter'.
+		:type par: str
+
+		:param ax: Axis in which to plot the KDE. Optional, default ``None``, figure and axis will be created.
+		:type ax: :py:class:`matplotlib.axes._subplots.AxesSubplot`
+
+
+		:param lev: Confidence level (0 < lev < 1), optional. The default is 0.68.
+		:type lev: float
+		
+
+
+		'''
 		if type(z) == str:
 			par = z
 			z = self.dist[z]
@@ -586,6 +688,16 @@ class iStar(object):
 
 
 def lnprob(positions,**pars):
+	'''Likelihood 
+
+	The likelihood function for :py:class:`iStar.stellarInclination()`. Defined similar to the one in :cite:t:`Hjorth2021`:
+
+	.. math::
+		\mathcal{L} = \mathcal{N}(x_{R_\star};\mu_{R_\star},\sigma_{R_\star}) + \mathcal{N}(x_{P_{\\rm rot}};\mu_{P_{\\rm rot}},\sigma_{P_{\\rm rot}}) + \mathcal{N}(v u;\mu_{v \sin i_\star},\sigma_{v \sin i_\star}) \, ,
+
+	with :math:`u=\sqrt{ 1 - \mathcal{U}(x_{\cos i_\star};a=-1,b=1) }` and where :math:`x_i` is the drawn value for parameter :math:`i= R_\star,P_{\\rm rot},\cos i_\star`. :math:`\mathcal{L}` and :math:`\mathcal{U}` denote a gaussian respectively uniform prior. Other options are also available see :py:class:`coPsi.priors`.
+
+	'''
 	log_prob = 0.0
 	fps = pars['FPs']
 	for idx, par in enumerate(fps):
@@ -593,7 +705,7 @@ def lnprob(positions,**pars):
 		pri = pars[par][:4]
 		ptype = pars[par][-1]
 		pval, sigma, lower, upper = pri[0], pri[1], pri[2], pri[3]
-		if ptype == 'uni':
+		if ptype == 'uniform':
 			prob = flat_prior(val,lower,upper)
 		elif ptype == 'jeff':
 			prob = jeff_prior(val,lower,upper)

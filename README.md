@@ -32,7 +32,7 @@ dat.filterData()
 dat.plot(ax=ax)
 ## Fill the gaps (here for TESS downlink)
 dat.fillGaps()
-dat.plot(ax=ax)
+dat.plotData(ax=ax)
 
 ## Rotation
 

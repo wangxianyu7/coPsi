@@ -38,6 +38,7 @@ extensions = [
 'sphinx.ext.coverage', 
 'sphinx.ext.todo', 
 'sphinx.ext.napoleon',
+'sphinx_book_theme'
 ]
 
 # Add any paths that contain templates here, relative to this directory.

@@ -7,12 +7,11 @@ Created on Fri Sep  9 11:00:23 2022
 """
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.signal import savgol_filter
 from astropy.timeseries import LombScargle
-import statsmodels.api as sm
+from scipy.signal import savgol_filter
 from scipy.optimize import curve_fit
 from scipy.signal import find_peaks
-from astropy.timeseries import LombScargle
+import statsmodels.api as sm
 from .Phot import Data
 
 class Rotator(Data):
@@ -139,6 +138,7 @@ class Rotator(Data):
 			print('Prot = {:0.4f}+/-{:0.4f} d'.format(popt[1],popt[2]))
 		#self.fitPars = popt
 		#self.fitCov = pcov
+		self.ampl = popt[0]
 		self.per = popt[1]
 		self.sper = popt[2]
 		#return popt
@@ -318,13 +318,13 @@ class Rotator(Data):
 		ax.set_xlim(0.0,xmax)
 		
 		try:
-			mu = self.fitPars[1]
-			sigma = self.fitPars[2]
+			mu = self.per
+			sigma = self.sper
 			low = mu-sigma
 			high = mu+sigma
 
 			cc = (time < high) & (time > low)
-			yy = self.gauss(time,*self.fitPars)*np.amax(self.power)
+			yy = self.gauss(time,self.ampl,mu,sigma)#*np.amax(self.power)
 			ax.fill_between(time[cc],yy[cc],color='C0',alpha=0.6,zorder=-1)#,transform=ax.transAxes)
 			ax.plot(time,yy,lw=2.0,color='k')
 			ax.plot(time,yy,lw=1.0,color='C0',label=r'$\rm Gaussian \ fit$')

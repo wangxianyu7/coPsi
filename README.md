@@ -1,6 +1,7 @@
 # coPsi
 Stellar rotation, inclination, and orientation.
 
+[![Documentation Status](https://readthedocs.org/projects/copsi/badge/?version=latest)](https://copsi.readthedocs.io/en/latest/?badge=latest)
 
 
 ### Installation

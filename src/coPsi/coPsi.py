@@ -174,7 +174,7 @@ class iStar(object):
 		
 		self.dist['cosp'] = np.sin(incs)*np.sin(inco)*np.cos(lam) + np.cos(incs)*np.cos(inco)
 		self.dist['psi'] = np.rad2deg(np.arccos(self.dist['cosp']))
-    
+		return self.dist['psi']
 
 	def stellarInclinationDirectly(self,convert=True):
 		'''Stellar inclination directly.
@@ -624,7 +624,7 @@ class iStar(object):
 		return val, up, low
 
 
-	def diagnostics(self,z,par='Parameter',ax=None,lev=0.68):
+	def diagnostics(self,z,par='Parameter',ax=None,lev=0.68,verbose=False,plot=False):
 		'''Diagnostics and KDE plot
 
 		This function calculates and prints the median and confidence intervals (from :py:class:`hpd`). It also creates a plot of the KDE distribution with the confidence levels highlighted.
@@ -653,36 +653,39 @@ class iStar(object):
 			z = self.dist[z]
 
 		val, up, low = self.getConfidence(z,lev=lev)
-		print('Median and confidence level ({} credibility):'.format(lev))
-		print('{}={:0.3f}+{:0.3f}-{:0.3f}'.format(par,val,up,low))
+		if verbose == True:
+			print('Median and confidence level ({} credibility):'.format(lev))
+			print('{}={:0.3f}+{:0.3f}-{:0.3f}'.format(par,val,up,low))
 		xkde, ykde = self.getKDE(z)
-		if ax == None:
-			fig = plt.figure()
-			ax = fig.add_subplot(111)
-		ax.plot(xkde,ykde,color='k')
+		if plot==True:
+			if ax == None:
+				fig = plt.figure()
+				ax = fig.add_subplot(111)
+			ax.plot(xkde,ykde,color='k')
 
 
-		vals = (xkde > (val-low)) & (xkde < (up+val))
-		xs = xkde[vals]
-		ys = ykde[vals]
-		ax.fill_between(xs,ys,color='C0',alpha=0.5, label=r"$\rm HPD$")
+			vals = (xkde > (val-low)) & (xkde < (up+val))
+			xs = xkde[vals]
+			ys = ykde[vals]
+			ax.fill_between(xs,ys,color='C0',alpha=0.5, label=r"$\rm HPD$")
 
 
-		ax.set_ylim(ymin=0.0)
-		ax.set_xlim(min(xkde),max(xkde))
+			ax.set_ylim(ymin=0.0)
+			ax.set_xlim(min(xkde),max(xkde))
 
-		ax.set_ylabel(r'$\rm KDE$')
-		try:
-			ax.set_xlabel(self.labels[par])
-		except KeyError:
-			ax.set_xlabel(par)
+			ax.set_ylabel(r'$\rm KDE$')
+			try:
+				ax.set_xlabel(self.labels[par])
+			except KeyError:
+				ax.set_xlabel(par)
 
-		idx = np.argmin(abs(xkde-val))
-		plt.vlines(val,ymin=0,ymax=ykde[idx],linestyle='-',color='k')
-		idx_up = np.argmin(abs(xkde-(up+val)))
-		plt.vlines(up+val,ymin=0,ymax=ykde[idx_up],linestyle='--',color='k')
-		idx_low = np.argmin(abs(xkde-(val-low)))
-		plt.vlines(val-low,ymin=0,ymax=ykde[idx_low],linestyle='--',color='k')
+			idx = np.argmin(abs(xkde-val))
+			plt.vlines(val,ymin=0,ymax=ykde[idx],linestyle='-',color='k')
+			idx_up = np.argmin(abs(xkde-(up+val)))
+			plt.vlines(up+val,ymin=0,ymax=ykde[idx_up],linestyle='--',color='k')
+			idx_low = np.argmin(abs(xkde-(val-low)))
+			plt.vlines(val-low,ymin=0,ymax=ykde[idx_low],linestyle='--',color='k')
+		return par,val,up,low
 
 
 def lnprob(positions,**pars):

@@ -39,9 +39,9 @@ class AnyObjectHandler(HandlerBase):
 					x0, y0, width, height, fontsize, trans,twocolor=True):
 
 		l1 = plt.Line2D([x0,y0+width], [0.5*height,0.5*height],
-				  linestyle='-', color=handles[2],lw=3.0,zorder=-1)
+					linestyle='-', color=handles[2],lw=3.0,zorder=-1)
 		l2 = plt.Line2D([x0,y0+width], [0.5*height,0.5*height],
-				  linestyle=handles[1], color=handles[0],lw=1.5,zorder=-1)          
+					linestyle=handles[1], color=handles[0],lw=1.5,zorder=-1)          
 		return [l1, l2] 
 
 # =============================================================================
@@ -88,6 +88,9 @@ class iStar(object):
 	:param labels: Dictionary to map labels for parameters.
 	:type labels: dict
 
+	:param cLouden: Dictionary with coefficients for :py:class:`stellarInclinationLouden`.
+	:type cLouden: dict
+
 
 	'''
 	parameters = [#'incs', 
@@ -98,13 +101,13 @@ class iStar(object):
 				'vsini',
 				'Teff',
 				'psi'
-               ]
+            ]
 
 	stepParameters = [
 				'Rs',
 				'Prot',
 				'cosi'
-                   ]
+                ]
 
 	labels = {
 			'Rs'    : r'$R_\star \ \ (R_\odot)$',
@@ -117,18 +120,16 @@ class iStar(object):
 			}
 
 	def __init__(self,
-              inco = (85.,0.5,0.0,90.,'gauss'),
-              lam = (0,0.5,-180.,180.,'gauss'),
-              Prot = (3.5,0.5,0.0,10.,'gauss'),
-              Rs = (1.0,0.1,0.5,2.0,'gauss'),
-              vsini = (4.5,0.5,0.0,10.,'gauss'),
-              cosi = (0,0.1,-1.0,1.0,'uniform'),
-              Teff = (6250,100,3000,9000,'gauss'),
-              ):
+				inco = (85.,0.5,0.0,90.,'gauss'),
+				lam = (0,0.5,-180.,180.,'gauss'),
+				Prot = (3.5,0.5,0.0,10.,'gauss'),
+				Rs = (1.0,0.1,0.5,2.0,'gauss'),
+				vsini = (4.5,0.5,0.0,10.,'gauss'),
+				cosi = (0,0.1,-1.0,1.0,'uniform'),
+				Teff = (6250,100,3000,9000,'gauss'),
+				):
 		'''Constructor
-  
 
-  
 		'''
 		self.inco = inco
 		self.lam = lam
@@ -211,7 +212,7 @@ class iStar(object):
 
 		si = self.dist['Prot']*self.dist['vsini']/(2*np.pi*self.dist['Rs'])
 		incs = np.arcsin(si)
-		self.dist['incs'] =  np.rad2deg(incs)
+		self.dist['incs'] = np.rad2deg(incs)
 
 	def stellarInclinationLouden(self,oblDist='two'):
 		'''Stellar inclination relation
@@ -246,7 +247,7 @@ class iStar(object):
 					usetex=False,font=12,ymax=25,xmax=6700):
 		'''Plot Louden relations.
 
-		Plot the :math:`T_{\\rm eff}`,:math:`v \sin i_\star` from :cite:t:`Louden2021`. Compare by providing values for :math:`T_{\\rm eff}`,:math:`v \sin i_\star`.
+		Plot the :math:`T_{\\rm eff}`, :math:`v \sin i_\star` from :cite:t:`Louden2021`. Compare by providing values for :math:`T_{\\rm eff}`,:math:`v \sin i_\star`.
 		
 		:param teffs: Grid values for :math:`T_{\\rm eff}` - [start,end,npoints]. Optional, ``[5700,6700,1000]``.
 		:type teffs: list
@@ -377,6 +378,12 @@ class iStar(object):
 
 		'''
 
+		try:
+			self.dist
+		except AttributeError:
+			print('Distributions not initilialized.\nCalling iStar.createDistributions.')
+			self.createDistributions()
+
 		def start_coords(nwalkers,ndim):
 			fps = self.stepParameters
 			pos = []
@@ -468,7 +475,10 @@ class iStar(object):
 		samples = sampler.get_chain(discard=burnin)	
 		flat_samples = sampler.get_chain(discard=burnin, flat=True, thin=thin)	
 		flat_samples[:,2] = abs(flat_samples[:,2])
+
+		self.dist['cosi'] = flat_samples[:,2]
 		incs = np.rad2deg(np.arccos(flat_samples[:,2]))
+		self.dist['incs'] = incs
 		flat_samples = np.concatenate(
 							(flat_samples, incs[:,None]), axis=1)
 
@@ -505,6 +515,8 @@ class iStar(object):
 			corner.corner(all_samples, labels=labs, truths=None)
 			if save_corner:
 				plt.savefig(path+'corner.pdf')
+
+
 		return res_df
 
 
@@ -521,8 +533,8 @@ class iStar(object):
 
 		'''
 
-		pars = vars(self)
 		self.dist = {}
+		pars = vars(self)
 		generateDist = []
 
 		for par in pars:

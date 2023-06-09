@@ -1,5 +1,5 @@
 numpy
-sphinx-book-theme==0.13.1
+sphinx-book-theme
 nbsphinx
 sphinxcontrib-bibtex
 ipython

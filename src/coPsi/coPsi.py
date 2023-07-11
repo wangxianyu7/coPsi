@@ -474,7 +474,7 @@ class iStar(object):
 		burnin = int(n_auto * np.max(tau))
 		samples = sampler.get_chain(discard=burnin)	
 		flat_samples = sampler.get_chain(discard=burnin, flat=True, thin=thin)	
-		flat_samples[:,2] = flat_samples[:,2]
+		flat_samples[:,2] = abs(flat_samples[:,2])
 
 		self.dist['cosi'] = flat_samples[:,2]
 		incs = np.rad2deg(np.arccos(flat_samples[:,2]))

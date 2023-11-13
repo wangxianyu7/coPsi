@@ -71,6 +71,8 @@ html_static_path = ['_static']
 html_logo = "figures/logo.png"
 html_theme_options = {
     "logo_only": True,
+    "repository_url" : "https://github.com/emilknudstrup/coPsi",
+    "use_repository_button": True,
 }
 
 # Bibliography

@@ -40,7 +40,7 @@ class Rotator(Data):
 
 		Calculated using :py:class:`statsmodels.api.tsa.acf()`.
 
-		:param lags: Lags for which to calculate ACF. Optional, default ``numpy.array([])`.
+		:param lags: Lags for which to calculate ACF. Optional, default ``numpy.array([])``.
 		:type lags: array
 
 		:param maxT: Maximum length of uninterrupted observations in timeseries. Default ``None``, will use the maximum time in the timeseries.

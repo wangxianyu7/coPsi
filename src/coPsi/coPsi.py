@@ -334,9 +334,9 @@ class iStar(object):
 
 	def stellarInclination(self,ndraws=10000,nwalkers=100,nproc=1,
                         moves=None,path='./',
-                        plot_corner=True,save_df=True,
-                        save_corner=True,save_convergence=False,
-                        plot_convergence=True):
+                        plot_corner=True,plot_vsini=True,save_df=True,
+                        save_corner=True,save_vsini=True,
+						save_convergence=False,plot_convergence=True):
 		'''Stellar inclination (properly)
 		
 		Here the stellar inclination is calculated following :cite:t:`Masuda2020`, where we perform a Monte Carlo Markov Chain (MCMC) sampling of the posterior for :math:`i_\star`.
@@ -361,11 +361,17 @@ class iStar(object):
 		:param plot_corner: Whether to create a :py:class:`corner` :cite:p:`corner` plot. Optional, default ``True``.
 		:type plot_corner: bool
 
+		:param plot_vsini: Whether to plot the distribution of the resulting :math:`v` against the input value for :math:`v \sin i_\star`. Optional, default ``True``.
+		:type plot_vsini: bool
+
 		:param save_df: Whether to save the results in a .csv file. Optional, default ``True``.
 		:type save_df: bool
 
 		:param save_corner: Whether to save the corner plot. Optional, default ``True``.
 		:type save_corner: bool
+		
+		:param save_vsini: Whether to save the vsini plot. Optional, default ``True``.
+		:type save_vsini: bool
 
 		:param save_convergence: Whether to save the convergence plot. Optional, default ``False``.
 		:type save_convergence: bool
@@ -513,9 +519,31 @@ class iStar(object):
 				(flat_samples, log_prob_samples[:, None]), axis=1)
 			medians.append(np.amax(log_prob_samples[:, None]))
 			corner.corner(all_samples, labels=labs, truths=None)
+
 			if save_corner:
 				plt.savefig(path+'corner.pdf')
 
+		if plot_vsini:
+			fig = plt.figure()
+			ax = fig.add_subplot(111)
+			ax.hist(v,color='C0',
+					bins=50, density=True, histtype='step', 
+					stacked=True, fill=False,
+					label=r'$v, \ \rm calculated$')
+			veq = 2*np.pi*self.Rs[0]*rsunfac/(self.Prot[0]*dayfac)
+			ax.axvline(veq,ls='-',lw=1.0,label=r'$v_{\rm eq}=2 \pi R_\star/P_{\rm rot}$',color='C0')
+			ax.hist(v*np.sin(np.deg2rad(incs)),color='C1',
+					bins=50, density=True, histtype='step', 
+					stacked=True, fill=False,
+					label=r'$v \sin i_\star, \ \rm calculated$')
+			ax.axvline(self.vsini[0],color='C1',ls='-',lw=1.0,label=r'$v \sin i_\star, \ \rm input$')
+			ax.axvline(self.vsini[0]-self.vsini[1],color='C1',ls='--',lw=1.0)
+			ax.axvline(self.vsini[0]+self.vsini[1],color='C1',ls='--',lw=1.0)
+			ax.set_xlabel(r'$v \sin i_\star \ \rm (km/s)$')
+			ax.set_ylabel(r'$\rm PDF$')
+			ax.legend()
+			if save_vsini:
+				plt.savefig(path+'vsini.pdf')
 
 		return res_df
 
@@ -755,7 +783,7 @@ if __name__ == '__main__':
 	p = p.to_value('s')
 	sp = 0.32774516*u.d
 	sp = sp.to_value('s')
-	 
+
 	Prot = createDistribution(N,p,sp)
 	
 	si = stellarInclination(Prot,rs,vs)#*deg2rad

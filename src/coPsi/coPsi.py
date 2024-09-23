@@ -39,9 +39,9 @@ class AnyObjectHandler(HandlerBase):
 					x0, y0, width, height, fontsize, trans,twocolor=True):
 
 		l1 = plt.Line2D([x0,y0+width], [0.5*height,0.5*height],
-				  linestyle='-', color=handles[2],lw=3.0,zorder=-1)
+					linestyle='-', color=handles[2],lw=3.0,zorder=-1)
 		l2 = plt.Line2D([x0,y0+width], [0.5*height,0.5*height],
-				  linestyle=handles[1], color=handles[0],lw=1.5,zorder=-1)          
+					linestyle=handles[1], color=handles[0],lw=1.5,zorder=-1)          
 		return [l1, l2] 
 
 # =============================================================================
@@ -88,6 +88,9 @@ class iStar(object):
 	:param labels: Dictionary to map labels for parameters.
 	:type labels: dict
 
+	:param cLouden: Dictionary with coefficients for :py:class:`stellarInclinationLouden`.
+	:type cLouden: dict
+
 
 	'''
 	parameters = [#'incs', 
@@ -98,13 +101,13 @@ class iStar(object):
 				'vsini',
 				'Teff',
 				'psi'
-               ]
+            ]
 
 	stepParameters = [
 				'Rs',
 				'Prot',
 				'cosi'
-                   ]
+                ]
 
 	labels = {
 			'Rs'    : r'$R_\star \ \ (R_\odot)$',
@@ -117,18 +120,16 @@ class iStar(object):
 			}
 
 	def __init__(self,
-              inco = (85.,0.5,0.0,90.,'gauss'),
-              lam = (0,0.5,-180.,180.,'gauss'),
-              Prot = (3.5,0.5,0.0,10.,'gauss'),
-              Rs = (1.0,0.1,0.5,2.0,'gauss'),
-              vsini = (4.5,0.5,0.0,10.,'gauss'),
-              cosi = (0,0.1,-1.0,1.0,'uniform'),
-              Teff = (6250,100,3000,9000,'gauss'),
-              ):
+				inco = (85.,0.5,0.0,90.,'gauss'),
+				lam = (0,0.5,-180.,180.,'gauss'),
+				Prot = (3.5,0.5,0.0,10.,'gauss'),
+				Rs = (1.0,0.1,0.5,2.0,'gauss'),
+				vsini = (4.5,0.5,0.0,10.,'gauss'),
+				cosi = (0,0.1,-1.0,1.0,'uniform'),
+				Teff = (6250,100,3000,9000,'gauss'),
+				):
 		'''Constructor
-  
 
-  
 		'''
 		self.inco = inco
 		self.lam = lam
@@ -211,7 +212,7 @@ class iStar(object):
 
 		si = self.dist['Prot']*self.dist['vsini']/(2*np.pi*self.dist['Rs'])
 		incs = np.arcsin(si)
-		self.dist['incs'] =  np.rad2deg(incs)
+		self.dist['incs'] = np.rad2deg(incs)
 
 	def stellarInclinationLouden(self,oblDist='two'):
 		'''Stellar inclination relation
@@ -246,7 +247,7 @@ class iStar(object):
 					usetex=False,font=12,ymax=25,xmax=6700):
 		'''Plot Louden relations.
 
-		Plot the :math:`T_{\\rm eff}`,:math:`v \sin i_\star` from :cite:t:`Louden2021`. Compare by providing values for :math:`T_{\\rm eff}`,:math:`v \sin i_\star`.
+		Plot the :math:`T_{\\rm eff}`, :math:`v \sin i_\star` from :cite:t:`Louden2021`. Compare by providing values for :math:`T_{\\rm eff}`,:math:`v \sin i_\star`.
 		
 		:param teffs: Grid values for :math:`T_{\\rm eff}` - [start,end,npoints]. Optional, ``[5700,6700,1000]``.
 		:type teffs: list
@@ -333,9 +334,9 @@ class iStar(object):
 
 	def stellarInclination(self,ndraws=10000,nwalkers=100,nproc=1,
                         moves=None,path='./',
-                        plot_corner=True,save_df=True,
-                        save_corner=True,save_convergence=False,
-                        plot_convergence=True):
+                        plot_corner=True,plot_vsini=True,save_df=True,
+                        save_corner=True,save_vsini=True,
+						save_convergence=False,plot_convergence=True):
 		'''Stellar inclination (properly)
 		
 		Here the stellar inclination is calculated following :cite:t:`Masuda2020`, where we perform a Monte Carlo Markov Chain (MCMC) sampling of the posterior for :math:`i_\star`.
@@ -360,11 +361,17 @@ class iStar(object):
 		:param plot_corner: Whether to create a :py:class:`corner` :cite:p:`corner` plot. Optional, default ``True``.
 		:type plot_corner: bool
 
+		:param plot_vsini: Whether to plot the distribution of the resulting :math:`v` against the input value for :math:`v \sin i_\star`. Optional, default ``True``.
+		:type plot_vsini: bool
+
 		:param save_df: Whether to save the results in a .csv file. Optional, default ``True``.
 		:type save_df: bool
 
 		:param save_corner: Whether to save the corner plot. Optional, default ``True``.
 		:type save_corner: bool
+		
+		:param save_vsini: Whether to save the vsini plot. Optional, default ``True``.
+		:type save_vsini: bool
 
 		:param save_convergence: Whether to save the convergence plot. Optional, default ``False``.
 		:type save_convergence: bool
@@ -376,6 +383,12 @@ class iStar(object):
 
 
 		'''
+
+		try:
+			self.dist
+		except AttributeError:
+			print('Distributions not initilialized.\nCalling iStar.createDistributions.')
+			self.createDistributions()
 
 		def start_coords(nwalkers,ndim):
 			fps = self.stepParameters
@@ -468,7 +481,10 @@ class iStar(object):
 		samples = sampler.get_chain(discard=burnin)	
 		flat_samples = sampler.get_chain(discard=burnin, flat=True, thin=thin)	
 		flat_samples[:,2] = abs(flat_samples[:,2])
+
+		self.dist['cosi'] = flat_samples[:,2]
 		incs = np.rad2deg(np.arccos(flat_samples[:,2]))
+		self.dist['incs'] = incs
 		flat_samples = np.concatenate(
 							(flat_samples, incs[:,None]), axis=1)
 
@@ -503,8 +519,32 @@ class iStar(object):
 				(flat_samples, log_prob_samples[:, None]), axis=1)
 			medians.append(np.amax(log_prob_samples[:, None]))
 			corner.corner(all_samples, labels=labs, truths=None)
+
 			if save_corner:
 				plt.savefig(path+'corner.pdf')
+
+		if plot_vsini:
+			fig = plt.figure()
+			ax = fig.add_subplot(111)
+			ax.hist(v,color='C0',
+					bins=50, density=True, histtype='step', 
+					stacked=True, fill=False,
+					label=r'$v, \ \rm calculated$')
+			veq = 2*np.pi*self.Rs[0]*rsunfac/(self.Prot[0]*dayfac)
+			ax.axvline(veq,ls='-',lw=1.0,label=r'$v_{\rm eq}=2 \pi R_\star/P_{\rm rot}$',color='C0')
+			ax.hist(v*np.sin(np.deg2rad(incs)),color='C1',
+					bins=50, density=True, histtype='step', 
+					stacked=True, fill=False,
+					label=r'$v \sin i_\star, \ \rm calculated$')
+			ax.axvline(self.vsini[0],color='C1',ls='-',lw=1.0,label=r'$v \sin i_\star, \ \rm input$')
+			ax.axvline(self.vsini[0]-self.vsini[1],color='C1',ls='--',lw=1.0)
+			ax.axvline(self.vsini[0]+self.vsini[1],color='C1',ls='--',lw=1.0)
+			ax.set_xlabel(r'$v \sin i_\star \ \rm (km/s)$')
+			ax.set_ylabel(r'$\rm PDF$')
+			ax.legend()
+			if save_vsini:
+				plt.savefig(path+'vsini.pdf')
+
 		return res_df
 
 
@@ -521,8 +561,8 @@ class iStar(object):
 
 		'''
 
-		pars = vars(self)
 		self.dist = {}
+		pars = vars(self)
 		generateDist = []
 
 		for par in pars:
@@ -746,7 +786,7 @@ if __name__ == '__main__':
 	p = p.to_value('s')
 	sp = 0.32774516*u.d
 	sp = sp.to_value('s')
-	 
+
 	Prot = createDistribution(N,p,sp)
 	
 	si = stellarInclination(Prot,rs,vs)#*deg2rad

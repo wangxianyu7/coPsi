@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+'''
+
+Module to read in and manipulate photometric data.
+
+'''
 
 import numpy as np
 from scipy.signal import savgol_filter
@@ -30,13 +35,15 @@ class Data(object):
 	
 	'''
 
-	def __init__(self,file=None,x=np.array([]),y=np.array([]),dy=None,cadence=None):
+	def __init__(self,file=None,x=np.array([]),y=np.array([]),
+				dy=None,cadence=None):
 		'''Constructor
 
 		'''
 		if file != None:
 			self.readData(file)
 			self.getCadence()
+			# self.maxTime(tolGap=tolGap)
 		else:
 			self.x = x
 			self.y = y
@@ -45,23 +52,34 @@ class Data(object):
 				self.getCadence()
 			else:
 				self.cadence = cadence
+			# if maxT is None:
+			# 	self.maxTime(tolGap=tolGap)
+			# else:
+			# 	self.maxT = maxT
 
 		self.ii = 0
 
-	def readData(self,file):
+	def readData(self,file,atzero=True):
 		'''Data from .txt file
 
-		t1 fl1 efl1
-		t2 fl2 efl2
-		...........
-		tn fln efln
+		======  ====  =====
+		# time  flux  error
+		======  ====  =====
+		t1      fl1   efl1
+		t2      fl2   efl2
+		...     ...   ...
+		tn      fln   efln
+		======  ====  =====
 
 		:param file: Filename.
 		:type file: str
 
+		:param atzero: Whether to set the first time stamp to zero. Optional, default ``True``.
+		:type atzero: bool
+
 		'''
 		arr = np.loadtxt(file)
-		self.x = arr[:,0]
+		self.x = arr[:,0] - min(arr[:,0]) if atzero else arr[:,0]
 		self.y = arr[:,1]
 		ncols = arr.shape[1]
 		if ncols > 2:
@@ -92,6 +110,93 @@ class Data(object):
 
 		'''
 		self.cadence = np.median(np.diff(self.x))
+
+	def bin2cadence(self,cadence):
+		'''Bin to cadence
+
+		Bin the data to a given cadence.
+
+		:param cadence: Cadence for observations. Unit same as ``self.x``.
+		:type cadence: float
+
+		'''
+
+		## Bin the data
+		bins = np.arange(min(self.x),max(self.x),cadence)
+		digi = np.digitize(self.x,bins)
+		xx = np.array([self.x[digi == ii].mean() for ii in range(1,len(bins))])
+		yy = np.array([self.y[digi == ii].mean() for ii in range(1,len(bins))])
+		# if len(self.dy):
+		# 	dd = np.array([self.dy[digi == ii].mean() for ii in range(1,len(bins))])
+
+		## Remove nans
+		finite = np.isfinite(yy) & np.isfinite(xx)
+		xx = xx[finite]
+		yy = yy[finite]
+
+		## Save the unbinned data
+		self.ubx = self.x
+		self.uby = self.y
+		## Save the binned data
+		self.x = xx
+		self.y = yy
+		# if len(self.dy):
+		# 	self.uby = self.dy
+		# 	self.dy = dd
+
+	def appendData(self,x,y,dy=None,atzero=True):
+		'''Append data
+
+		Append data to the existing data.
+
+		:param x: Time.
+		:type x: array
+
+		:param y: Flux.
+		:type y: array
+
+		:param dy: Flux error. Optional, default ``None``.
+		:type dy: array
+
+		'''
+		x = np.append(self.x,x)
+		y = np.append(self.y,y)
+		ss = np.argsort(x)
+		self.x = x[ss]
+		self.y = y[ss]
+		if dy:
+			dy = np.append(self.dy,dy)
+			self.dy = dy[ss]
+		
+		if atzero:
+			self.x -= min(self.x)
+		
+	def maxTime(self,tolGap=5):
+		'''Maximum timeseries length
+
+		Find the maximum timeseries length between gaps exceeding ``tolGap`` days.
+
+		:param tolGap: Value to consider a gap in days. Optional, default 5.
+		:type tolGap: float
+
+		'''
+
+		diff = np.diff(self.x)
+		gaps = diff[diff > tolGap]
+		tooBig = [np.where(gap == diff)[0][0]+1 for gap in gaps]
+		lengths = []
+		idx = 0
+		for gap in tooBig:
+			lengths.append(max(self.x[idx:gap])-min(self.x[idx:gap]))
+			idx = gap
+		lengths.append(max(self.x[idx:])-min(self.x[idx:]))
+
+		print('Found {} chunks with gaps exceeding {} days:'.format(len(lengths),tolGap))
+		for i in range(len(lengths)):
+			print('Chunk {}: {:.2f} days'.format(i,lengths[i]))
+		print('Longest timeseries between gaps: {:.2f} days'.format(max(lengths)))
+		self.maxT = max(lengths)
+
 
 	def fillGaps(self,gap=0.5,yfill=None,cadence=None):
 		'''Fill gaps
@@ -126,10 +231,17 @@ class Data(object):
 			nx = np.append(nx,new_x[1:])
 			ny = np.append(ny,new_y[1:])
 		
+		## Save the data with gaps
+		self.xg = self.x
+		self.yg = self.y
+
+		## Sort the arrays
 		ss = np.argsort(nx)
 		nx = nx[ss]
 		ny = ny[ss]
-		nx -= min(self.x)
+		#nx -= min(self.x)
+		if int(min(self.x)):
+			nx -= min(self.x)
 		self.x = nx
 		self.y = ny
 

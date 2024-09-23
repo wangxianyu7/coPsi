@@ -26,11 +26,11 @@ dat = coPsi.Data()
 ## Read in data file
 dat.readData('phot/KELT-11_cad_120sec_rotation.txt')
 ## Plot the data and return the axis
-ax = dat.plot(return_ax=1)
+ax = dat.plotData(return_ax=1)
 ## Apply a Savitsky-Golay filter
 dat.filterData()
 ## Plot again on the same axis to compare
-dat.plot(ax=ax)
+dat.plotData(ax=ax)
 ## Fill the gaps (here for TESS downlink)
 dat.fillGaps()
 dat.plotData(ax=ax)

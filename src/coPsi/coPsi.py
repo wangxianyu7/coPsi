@@ -485,7 +485,7 @@ class iStar(object):
 		self.dist['cosi'] = flat_samples[:,2]
 		incs = np.rad2deg(np.arccos(flat_samples[:,2]))
 		self.dist['incs'] = incs
-		np.savetxt(path+'/incs.csv',incs, fmt='.7f')
+		np.savetxt(path+'/incs.csv',incs, fmt='%.7f')
 		flat_samples = np.concatenate(
 							(flat_samples, incs[:,None]), axis=1)
 
